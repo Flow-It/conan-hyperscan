@@ -1,62 +1,77 @@
 from conans import ConanFile, CMake, tools
+
 import os
+import shutil
 
-
-class LibnameConan(ConanFile):
-    name = "libname"
-    description = "Keep it short"
-    topics = ("conan", "libname", "logging")
-    url = "https://github.com/bincrafters/conan-libname"
-    homepage = "https://github.com/original_author/original_lib"
-    license = "MIT"  # Indicates license type of the packaged library; please use SPDX Identifiers https://spdx.org/licenses/
-    exports_sources = ["CMakeLists.txt"]
+class HyperscanConan(ConanFile):
+    name = "hyperscan"
+    license = "BSD-2-Clause"
+    author = "Intel Corporation"
+    url = "https://github.com/intel/hyperscan"
+    homepage = "https://www.hyperscan.io"
+    description = "High-performance regular expression matching library"
+    topics = ("regex", "regular expressions")
+    settings = "os", "compiler", "build_type", "arch"
     generators = "cmake"
 
-    settings = "os", "arch", "compiler", "build_type"
-    options = {"shared": [True, False], "fPIC": [True, False]}
-    default_options = {"shared": False, "fPIC": True}
-
     _source_subfolder = "source_subfolder"
-    _build_subfolder = "build_subfolder"
-    _cmake = None
 
-    requires = (
-        "zlib/1.2.11"
-    )
+    options = {
+        "shared": [True, False],
+        "fPIC": [True, False],
+        "optimise": [True, False],
+        "debug_output": [True, False],
+        "build_avx512": [True, False],
+        "fat_runtime": [True, False],
+        "build_chimera": [True, False],
+        "dump_support": [True, False]
+    }
 
-    def config_options(self):
-        if self.settings.os == 'Windows':
-            del self.options.fPIC
+    default_options = {
+        "shared": False,
+        "fPIC": True,
+        "optimise": True,
+        "debug_output": False,
+        "build_avx512": False,
+        "fat_runtime": False,
+        "build_chimera": False,
+        "dump_support": False
+    }
 
     def source(self):
         tools.get(**self.conan_data["sources"][self.version])
-        extracted_dir = self.name + "-" + self.version
-        os.rename(extracted_dir, self._source_subfolder)
+        os.rename("hyperscan-{0}".format(self.version), self._source_subfolder)
+
+    def build_requirements(self):
+        self.build_requires("boost/1.73.0");
+        self.build_requires("ragel_installer/6.10@bincrafters/stable");
+
+    def requirements(self):
+        if self.options.build_chimera:
+            self.required("pcre/8.41")
 
     def _configure_cmake(self):
-        if not self._cmake:
-            self._cmake = CMake(self)
-            self._cmake.definitions["BUILD_TESTS"] = False  # example
-            self._cmake.configure(build_folder=self._build_subfolder)
-        return self._cmake
+        cmake = CMake(self);
+        cmake.definitions["OPTIMISE"] = self.options.optimise
+        cmake.definitions["DEBUG_OUTPUT"] = self.options.debug_output
+        cmake.definitions["BUILD_AVX512"] = self.options.build_avx512
+        cmake.definitions["FAT_RUNTIME"] = self.options.fat_runtime
+        cmake.definitions["BUILD_CHIMERA"] = self.options.build_chimera
+        cmake.definitions["DUMP_SUPPORT"] = self.options.dump_support
+        cmake.configure(source_folder=self._source_subfolder)
+        return cmake
 
     def build(self):
         cmake = self._configure_cmake()
         cmake.build()
 
     def package(self):
-        self.copy(pattern="LICENSE", dst="licenses", src=self._source_subfolder)
         cmake = self._configure_cmake()
         cmake.install()
-        # If the CMakeLists.txt has a proper install method, the steps below may be redundant
-        # If so, you can just remove the lines below
-        include_folder = os.path.join(self._source_subfolder, "include")
-        self.copy(pattern="*", dst="include", src=include_folder)
-        self.copy(pattern="*.dll", dst="bin", keep_path=False)
-        self.copy(pattern="*.lib", dst="lib", keep_path=False)
-        self.copy(pattern="*.a", dst="lib", keep_path=False)
-        self.copy(pattern="*.so*", dst="lib", keep_path=False)
-        self.copy(pattern="*.dylib", dst="lib", keep_path=False)
+        self.copy("LICENSE", dst="licenses", src=self._source_subfolder)
+        # remove examples
+        shutil.rmtree(os.path.join(self.package_folder, "share"), ignore_errors=True)
 
     def package_info(self):
+        self.cpp_info.names["cmake_find_package"] = "hyperscan"
         self.cpp_info.libs = tools.collect_libs(self)

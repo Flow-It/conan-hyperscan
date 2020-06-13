@@ -1,4 +1,4 @@
 sources:
-  "1.0.0":
-    url: "https://github.com/libauthor/libname"
-    sha256: "98f6f57aab0a424469619ed3047728f0d3901ce8f0dea919c11e7966d807e870"
+  "5.2.1":
+    url: "https://github.com/intel/hyperscan/archive/v5.2.1.tar.gz"
+    sha256: "fd879e4ee5ecdd125e3a79ef040886978ae8f1203832d5a3f050c48f17eec867"
